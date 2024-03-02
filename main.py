@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import config
 from utils import EuclideanDistTracker, postProcess
+import requests 
 import torch
 from torchvision import transforms, models
 from torch import nn
@@ -18,7 +19,6 @@ import re
 import os
 import math
 import sys
-
 def calculate_distance(x1, y1, x2, y2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
@@ -35,7 +35,8 @@ def classify_closest_vehicle(frame, net, layer_names, output_layers, colors, car
     confidences = []
     classIDs = []
 
-    result = []  
+    result = []  # Initialize result as an empty list
+
     for output in outputs:
         for detection in output:
             scores = detection[5:]
@@ -78,7 +79,7 @@ def classify_closest_vehicle(frame, net, layer_names, output_layers, colors, car
         cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, color, 2)
 
-       
+        # Classification logic
         if classIDs[closest_vehicle_idx] == 2:
             result = car_color_classifier.predict(frame[max(y, 0):y + h, max(x, 0):x + w])
 
@@ -93,6 +94,7 @@ def classify_closest_vehicle(frame, net, layer_names, output_layers, colors, car
                 0.6, color, 2)
 
     if not result or 'make' not in result[0] or 'model' not in result[0]:
+        # Handle the case when result is an empty list or 'make'/'model' not found
         print(" Make/Model not found")
 
     return frame, result
@@ -131,10 +133,9 @@ classesFile = "classes.names"
 classes = None
 with open(classesFile, 'rt') as f:
     classes = f.read().rstrip('\n').split('\n')
-modelConfiguration = "darknet-yolov3.cfg"
-modelWeights = "model.weights"
 
-net = cv.dnn.readNetFromDarknet(modelConfiguration, modelWeights)
+
+net = cv.dnn.readNetFromDarknet(config.modelConfiguration, config.modelWeights)
 net.setPreferableBackend(cv.dnn.DNN_BACKEND_OPENCV)
 net.setPreferableTarget(cv.dnn.DNN_TARGET_CPU)
 
