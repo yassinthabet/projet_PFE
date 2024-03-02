@@ -6,22 +6,6 @@
 ![OpenCV](https://img.shields.io/badge/opencv-%23white.svg?style=for-the-badge&logo=opencv&logoColor=white)
 ![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white)
 
-
-📌 Jump straight to:
-- [Demo](#demo)
-- [Repository Contents](#repository-contents)
-- [Usage](#usage)
-- [Features](#features)
-- [Configuration Parameters](#configurations-parameters)
-
----
-
-## 🎥 Demo
-
-<p align="center">
-  <img src="https://github.com/Tejarsha-Arigila/Vehicle-Detection-Classification-Counting/blob/main/DEMO.gif" alt="Demo Output">
-</p>
-
 ---
 
 ## 📁 Repository Contents
@@ -34,10 +18,7 @@
   - 🧠 `yolov4.cfg`: YOLO model config.
   - 🔖 `coco.names`: Recognizable classes by the model.
 
-- 🎥 `VIDEO/`:
-  - 📹 `video2.mp4`: A test sample.
 
----
 
 ## 🚀 Usage
 
@@ -54,15 +35,6 @@
    python main.py
    ```
 5. 🖱 In the new window, double-click to position the counting line. Watch as vehicle stats get tallied in real-time!
-
----
-
-## 🌟 Features
-- 🕐 Real-time detection via YOLOv4.
-- 📏 Uses Euclidean distance for tracking.
-- 🖱 Set counting line with a double-click.
-- 📦 Non-Max Suppression (NMS) to declutter overlapping boxes.
-- 📊 Classifies and displays counts: Car 🚗, Motorbike 🏍, Bus 🚌, Truck 🚛.
 
 ---
 

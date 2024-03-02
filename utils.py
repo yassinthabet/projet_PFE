@@ -2,7 +2,6 @@ import math
 import os
 import cv2
 import numpy as np
-import requests
 from collections import Counter
 
 

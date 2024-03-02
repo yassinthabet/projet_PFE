@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 import config
 from utils import EuclideanDistTracker, postProcess
-import requests 
 import torch
 from torchvision import transforms, models
 from torch import nn
@@ -18,6 +17,7 @@ import pytesseract
 import re
 import os
 import math
+import sys
 
 def calculate_distance(x1, y1, x2, y2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
@@ -35,8 +35,7 @@ def classify_closest_vehicle(frame, net, layer_names, output_layers, colors, car
     confidences = []
     classIDs = []
 
-    result = []  # Initialize result as an empty list
-
+    result = []  
     for output in outputs:
         for detection in output:
             scores = detection[5:]
@@ -79,7 +78,7 @@ def classify_closest_vehicle(frame, net, layer_names, output_layers, colors, car
         cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, color, 2)
 
-        # Classification logic
+       
         if classIDs[closest_vehicle_idx] == 2:
             result = car_color_classifier.predict(frame[max(y, 0):y + h, max(x, 0):x + w])
 
@@ -94,7 +93,6 @@ def classify_closest_vehicle(frame, net, layer_names, output_layers, colors, car
                 0.6, color, 2)
 
     if not result or 'make' not in result[0] or 'model' not in result[0]:
-        # Handle the case when result is an empty list or 'make'/'model' not found
         print(" Make/Model not found")
 
     return frame, result
@@ -133,9 +131,10 @@ classesFile = "classes.names"
 classes = None
 with open(classesFile, 'rt') as f:
     classes = f.read().rstrip('\n').split('\n')
+modelConfiguration = "darknet-yolov3.cfg"
+modelWeights = "model.weights"
 
-
-net = cv.dnn.readNetFromDarknet(config.modelConfiguration, config.modelWeights)
+net = cv.dnn.readNetFromDarknet(modelConfiguration, modelWeights)
 net.setPreferableBackend(cv.dnn.DNN_BACKEND_OPENCV)
 net.setPreferableTarget(cv.dnn.DNN_TARGET_CPU)
 
@@ -152,7 +151,7 @@ class VehicleClassifier(nn.Module):
 
     def forward(self, x):
         return self.resnet50(x)
-    
+   
 def preprocess_vehicle_region(vehicle_region):
     if not isinstance(vehicle_region, Image.Image):
         vehicle_region = Image.fromarray(vehicle_region)
@@ -218,11 +217,11 @@ def matricule(frame, outs, width_factor=1.1, height_factor=1.0):
             predictions = model(input)
             predicted_class = torch.argmax(predictions).item()
             c = class_names.get(predicted_class, "Inconnu")
-    
+   
         custom_config = r'--oem 3 --psm 6'
         text = pytesseract.image_to_string(plate, config=custom_config)
         cleaned_text = re.sub(r'[^A-Z0-9]', '', text)
-        
+       
         if cleaned_text:
             return cleaned_text, c
 
@@ -230,13 +229,13 @@ def matricule(frame, outs, width_factor=1.1, height_factor=1.0):
 
 
 class VehicleCounter:
-    def __init__(self):
+    def __init__(self, video_path):
         self.broker_address = "127.0.0.1"
         self.broker_port = 1883
         self.topic = "vehicle_data"
         self.mqtt_client = mqtt.Client()
         self.tracker = EuclideanDistTracker()
-        self.cam = cv2.VideoCapture(config.VIDEO_PATH)
+        self.cam = cv2.VideoCapture(video_path)
         self.input_size = config.INPUT_SIZE
         self.confThreshold = config.CONFIDENCE_THRESHOLD
         self.nmsThreshold = config.NMS_THRESHOLD
@@ -252,9 +251,9 @@ class VehicleCounter:
 
     def publish_json_to_mqtt(self, json_data):
         self.mqtt_client.connect(self.broker_address, self.broker_port, 60)
-        self.mqtt_client.publish(self.topic, json_data)
+        self.mqtt_client.publish(self.topic, json_data, qos=0)
         self.mqtt_client.disconnect()
-        
+       
     def process_video(self):
         while True:
             current_time = time.time()
@@ -309,5 +308,10 @@ class VehicleCounter:
                     break
 
 if __name__ == "__main__":
-    vc = VehicleCounter()
+    if len(sys.argv) != 2:
+        print("Usage: python main.py <video_path>")
+        sys.exit(1)
+
+    video_path = sys.argv[1]
+    vc = VehicleCounter(video_path)
     vc.process_video()

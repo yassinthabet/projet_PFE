@@ -6,7 +6,7 @@ topic = "vehicle_data"
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
         print("Connected to broker")
-        client.subscribe(topic)
+        client.subscribe(topic, qos=0)
     else:
         print("Failed to connect to broker with code", rc)
 
