@@ -74,10 +74,6 @@ def resizeAndPad(img, size, padColor=0):
 
 class Classifier():
     def __init__(self):
-        # uncomment the next 3 lines if you want to use CPU instead of GPU
-        #import os
-        #os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-        #os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
         self.graph = load_graph(model_file)
         self.labels = load_labels(label_file)

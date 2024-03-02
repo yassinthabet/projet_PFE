@@ -78,3 +78,7 @@
 - `MODEL_WEIGHTS`: YOLO's weight file path (download separately).
 
 > 🛠 Tweak these in config.py to fit your scenario.
+
+-marque model:
+Download complete Project and Weights: https://drive.google.com/file/d/1QSqDY6a6KXtD4Lael44qWh-Z8QVZqbbs/view?usp=sharing
+
