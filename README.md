@@ -82,3 +82,5 @@
 -marque model:
 Download complete Project and Weights: https://drive.google.com/file/d/1QSqDY6a6KXtD4Lael44qWh-Z8QVZqbbs/view?usp=sharing
 
+yolov3.weights must be downloaded from https://pjreddie.com/media/files/yolov3.weights and saved in folder yolo-coco
+
