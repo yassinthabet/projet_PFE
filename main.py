@@ -10,13 +10,10 @@ from torch import nn
 from PIL import Image
 import paho.mqtt.client as mqtt
 from torchvision.models import resnet50
-import classifier
 import cv2 as cv
 import pytesseract
 import re
-import base64
 import http.client as httplib
-import ssl
 
 # Chargement du modèle de détection de couleur
 final_model = torch.load('./final_model_85.t', map_location='cpu')
@@ -28,43 +25,65 @@ transform = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-# Configuration pour l'accès à l'API de détection de véhicules
-headers = {"Content-type": "application/json",
-           "X-Access-Token": "yrkuYbYWugkjcM3tfpO4ffCGHHOYgaJehWOD"}
 
 class_name = ['Black', 'Blue', 'Brown', 'Green', 'Orange', 'Red', 'Silver', 'White', 'Yellow']
 
 # Fonction pour obtenir les coordonnées de la boîte englobante du véhicule
-def get_box(path):
-    image_data = base64.b64encode(open(path, 'rb').read()).decode()
-    params = json.dumps({"image": image_data})
+def get_box(image_path):
+    # Charger l'image
+    image = cv2.imread(image_path)
     
-    conn = httplib.HTTPSConnection("dev.sighthoundapi.com", 
-        context=ssl.SSLContext(ssl.PROTOCOL_TLSv1_2))
+    # Charger le modèle de détection d'objets (exemple : modèle YOLO)
+    net = cv2.dnn.readNetFromDarknet("./yolo-coco/yolov3.cfg", "./yolo-coco/yolov3.weights")  # Utiliser le chemin approprié pour votre modèle
     
-    conn.request("POST", "/v1/recognition?objectType=vehicle", params, headers)
-    response = conn.getresponse()
-    result = response.read()
-    json_obj = json.loads(result)
+    # Obtenir les noms des couches de sortie
+    layer_names = net.getLayerNames()
+    output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
+    
+    # Redimensionner l'image et la passer à travers le réseau
+    blob = cv2.dnn.blobFromImage(image, 0.00392, (416, 416), swapRB=True, crop=False)
+    net.setInput(blob)
+    outs = net.forward(output_layers)
+    
+    boxes = []
+    confidences = []
+    class_ids = []
+    
+    # Analyser les sorties du réseau
+    for out in outs:
+        for detection in out:
+            scores = detection[5:]
+            class_id = np.argmax(scores)
+            confidence = scores[class_id]
+            if confidence > 0.5 and class_id == 2:  # Identifier la classe pour les véhicules (ex: car)
+                # Récupérer les coordonnées de la boîte englobante
+                center_x = int(detection[0] * image.shape[1])
+                center_y = int(detection[1] * image.shape[0])
+                w = int(detection[2] * image.shape[1])
+                h = int(detection[3] * image.shape[0])
+                x = int(center_x - w / 2)
+                y = int(center_y - h / 2)
+                boxes.append([x, y, w, h])
+                confidences.append(float(confidence))
+                class_ids.append(class_id)
+    
+    # Supprimer les détections non précises en utilisant la suppression non maximale
+    indices = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
+    
+    # Renvoyer les coordonnées de la boîte englobante du premier véhicule détecté
+    if len(indices) > 0:  # Vérifier si des indices sont retournés
+        i = indices.flatten()  # Aplatir les indices
+        return boxes[i[0]]  # Utiliser le premier indice retourné
+    else:
+        return None
 
-    if 'reasonCode' in json_obj and json_obj['reasonCode'] == 50202:
-        print(json_obj)
-        return 'TL'
-    if not json_obj or 'objects' not in json_obj or len(json_obj['objects']) < 1:
-        return False
-    
-    annot = json_obj['objects'][0]['vehicleAnnotation']
-    vertices = annot['bounding']['vertices']
-    xy1 = vertices[0]
-    xy3 = vertices[2]
-    return xy1['x'], xy1['y'], xy3['x'], xy3['y']
 
 # Fonction pour recadrer l'image du véhicule
-def crop_car(src_path, x1, y1, x2, y2):
+def crop_car(src_path, x, y, w, h):
     src_image = cv2.imread(src_path)
     if src_image is None:
         return
-    crop_image = src_image[y1:y2, x1:x2]
+    crop_image = src_image[y:y+h, x:x+w]
     dst_img = cv2.resize(src=crop_image, dsize=(224, 224))
     img = Image.fromarray(dst_img)
     image = transform(img).float()
@@ -73,10 +92,10 @@ def crop_car(src_path, x1, y1, x2, y2):
 
 # Fonction pour prédire la couleur du véhicule
 def predict_color(src):
-    resp = get_box(src)
-    if not resp:
+    box = get_box(src)
+    if box is None:
         return "error"
-    image = crop_car(src, *resp)
+    image = crop_car(src, *box)
     preds = final_model(image)
     return class_name[int(preds.max(1)[1][0])]
 
@@ -221,6 +240,9 @@ class VehicleCounter:
                 self.cam.set(cv2.CAP_PROP_POS_MSEC, self.frame_pos)  
                 ret, frame = self.cam.read()
                 if ret:
+                   t = self.cam.get(cv2.CAP_PROP_POS_MSEC)
+                   print(f"Temps écoulé: {t:.2f} ms")
+                   print(f"Frame {self.frame_pos} lue")
                    blob = cv2.dnn.blobFromImage(frame, 1 / 255, (self.input_size, self.input_size), [0, 0, 0], 1, crop=False)
                    self.net.setInput(blob)
                    layersNames = self.net.getLayerNames()
