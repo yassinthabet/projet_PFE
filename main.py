@@ -31,8 +31,8 @@ except FileNotFoundError:
     print(f"Error: Classes file '{config.CLASSES_FILE}' not found.")
     sys.exit(1)
 
-modelConfiguration = "./matricule_model/darknet-yolov3.cfg"
-modelWeights = "./matricule_model/model.weights"
+modelConfiguration = "./darknet-yolov3.cfg"
+modelWeights = "./model.weights"
 
 try:
     net = cv2.dnn.readNetFromDarknet(modelConfiguration, modelWeights)
