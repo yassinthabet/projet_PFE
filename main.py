@@ -1,4 +1,3 @@
-
 import json
 import time
 import cv2
@@ -196,7 +195,7 @@ class VehicleCounter:
 
                          closest_vehicle = postProcess(outputs, frame, self.colors, self.classNames, self.confThreshold, self.nmsThreshold,
                                             self.required_class_index, self.tracker)
-                         json_data = None  
+                         json_data = None  # Initialisation de json_data à None
                          if closest_vehicle:
                              cv2.imwrite("screenshot.jpg", frame)
                              with torch.no_grad():
@@ -205,7 +204,7 @@ class VehicleCounter:
                                  outs1 = net.forward(getOutputsNames(net))
                                  m, c = matricule(frame, outs1)
                             
-                             if c != "Inconnu" and m != "Non detecte":  
+                             if c != "Inconnu" and m != "Non detecte":  # Vérifier si la matricule et le pays sont détectés
                                  json_data = {
                                      "activity": "Monitoring",
                                      "class": closest_vehicle['name'],
@@ -246,4 +245,3 @@ if __name__ == "__main__":
     video_path = sys.argv[1]
     vc = VehicleCounter(video_path)
     vc.process_video()
-
