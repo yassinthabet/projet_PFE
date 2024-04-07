@@ -187,7 +187,7 @@ class VehicleCounter:
                  ret, frame = self.cam.read()
                  if ret:
                      if analyze_frame:
-                         print("ok")
+                         
                          blob = cv2.dnn.blobFromImage(frame, 1 / 255, (self.input_size, self.input_size), [0, 0, 0], 1, crop=False)
                          self.net.setInput(blob)
                          layersNames = self.net.getLayerNames()
@@ -226,7 +226,7 @@ class VehicleCounter:
                                  print("Message sent")
                          analyze_frame = False  
                      else:
-                         print("no")
+                         
                          frame_counter += 1  
                          if frame_counter == 7:  
                              frame_counter = 0
