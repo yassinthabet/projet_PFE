@@ -1,3 +1,4 @@
+
 import json
 import time
 import cv2
@@ -8,13 +9,13 @@ import torch
 from torchvision import transforms, models
 from torch import nn
 from PIL import Image
+import torchvision
 import paho.mqtt.client as mqtt
 from torchvision.models import resnet50
+import sys
 import cv2 as cv
 import pytesseract
 import re
-import http.client as httplib
-import sys
 import traceback
 
 confThreshold = 0.5  
@@ -25,26 +26,22 @@ inpHeight = 416
 classesFile = "classes.names"
 classes = None
 try:
-    with open(config.CLASSES_FILE, 'rt') as f:
+    with open(classesFile, 'rt') as f:
         classes = f.read().rstrip('\n').split('\n')
-except FileNotFoundError:
-    print(f"Error: Classes file '{config.CLASSES_FILE}' not found.")
+except FileNotFoundError as e:
+    print(f"Error: Classes file '{classesFile}' not found: {e}")
     sys.exit(1)
 
 modelConfiguration = "./darknet-yolov3.cfg"
 modelWeights = "./model.weights"
 
 try:
-    net = cv2.dnn.readNetFromDarknet(modelConfiguration, modelWeights)
-except cv2.dnn.NetBackendNotAvailable:
-    print("Error: OpenCV DNN backend not available. Please ensure you have the required libraries installed.")
-    sys.exit(1)
-except cv2.dnn.OpenCVError as e:
+    net = cv.dnn.readNetFromDarknet(modelConfiguration, modelWeights)
+    net.setPreferableBackend(cv.dnn.DNN_BACKEND_OPENCV)
+    net.setPreferableTarget(cv.dnn.DNN_TARGET_CPU)
+except cv.error as e:
     print(f"Error loading model: {e}")
     sys.exit(1)
-
-net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
 
 def getOutputsNames(net):
     try:
@@ -90,7 +87,6 @@ except Exception as e:
     print(f"Erreur lors du chargement du modèle de classification de nationalité : {e}")
     sys.exit()
 
-
 def matricule(frame, outs, width_factor=1.1, height_factor=1.0):
     try:
         frameHeight = frame.shape[0]
@@ -121,7 +117,7 @@ def matricule(frame, outs, width_factor=1.1, height_factor=1.0):
                     boxes.append([left, top, width, height])
                     detected_plates.append(frame[top:top+height, left:left+width])
 
-        indices = cv2.dnn.NMSBoxes(boxes, confidences, confThreshold, nmsThreshold)
+        indices = cv.dnn.NMSBoxes(boxes, confidences, confThreshold, nmsThreshold)
         detected_plates = []
 
         for i in range(len(indices)):
@@ -139,11 +135,11 @@ def matricule(frame, outs, width_factor=1.1, height_factor=1.0):
                 predictions = model(input_tensor)
                 predicted_class = torch.argmax(predictions).item()
                 c = class_names.get(predicted_class, "Inconnu")
-
+    
             custom_config = r'--oem 3 --psm 6'
             text = pytesseract.image_to_string(plate, config=custom_config)
             cleaned_text = re.sub(r'[^A-Z0-9]', '', text)
-
+        
             if cleaned_text:
                 return cleaned_text, c
 
@@ -151,45 +147,6 @@ def matricule(frame, outs, width_factor=1.1, height_factor=1.0):
     except Exception as e:
         print("Erreur lors de la détection de la plaque d'immatriculation:", e)
 
-def load_checkpoint(filepath):
-    try:
-                                                
-       model = models.resnet34(pretrained=True)                          
-       num_ftrs = model.fc.in_features                                   
-       model.fc = nn.Linear(num_ftrs, 140)                               
-       checkpoint = torch.load(filepath, map_location=torch.device('cpu'))
-       model.load_state_dict(checkpoint['state_dict'], strict=False)     
-       model.class_to_idx = checkpoint['class_to_idx']                   
-                                                                      
-       return model 
-    except Exception as e:
-        print("Erreur lors du chargement du point de contrôle:", e)
-
-brand = load_checkpoint('brand.pth')                                  
-brand.eval() 
-with open('marque.json', 'r') as f:                                   
-    class_to_idx = json.load(f)                                       
-                                                                      
-idx_to_class = {idx: class_name for class_name, idx in class_to_idx.items()}
-
-
-img_transforms = transforms.Compose([                                 
-    transforms.Resize((244, 244)),                                    
-    transforms.CenterCrop(224),                                       
-    transforms.ToTensor(),                                            
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))            
-])                                                                    
-                                                                      
-def tansf_image(image_path):
-    try :                                          
-       image = Image.open(image_path)                                    
-       image = img_transforms(image).float()                             
-       image = image.unsqueeze(0)                                        
-       return image
-    except Exception as e:
-        print("Erreur lors du chargement de l'image:", e)
-    
-    
 class VehicleCounter:
     def __init__(self, video_path):
         try:
@@ -214,86 +171,71 @@ class VehicleCounter:
 
     def publish_json_to_mqtt(self, json_data):
         try:
-           self.mqtt_client.connect(self.broker_address, self.broker_port, 60)
-           self.mqtt_client.publish(self.topic, json_data, qos=0)
-           self.mqtt_client.disconnect()
+            self.mqtt_client.connect(self.broker_address, self.broker_port, 60)
+            self.mqtt_client.publish(self.topic, json_data, qos=0)
+            self.mqtt_client.disconnect()
         except Exception as e:
             print("Erreur lors de l'initialisation:", e)
             traceback.print_exc()
             
     def process_video(self):
-        s = time.time()
-        while self.cam.isOpened():           
-            ret, frame = self.cam.read()      
-            if ret:
-                try:
-                    blob = cv2.dnn.blobFromImage(frame, 1 / 255, (self.input_size, self.input_size), [0, 0, 0], 1, crop=False)
-                    self.net.setInput(blob)
-                    layersNames = self.net.getLayerNames()
-                    outputNames = [layersNames[i - 1] for i in self.net.getUnconnectedOutLayers()]
-                    outputs = self.net.forward(outputNames)
-                
-                    closest_vehicle = postProcess(outputs, frame, self.colors, self.classNames, self.confThreshold, self.nmsThreshold, self.required_class_index, self.tracker)               
-                    if closest_vehicle:
-                        try:
-                            cv2.imwrite("screenshot.jpg", frame) 
-                        except Exception as img_err:
-                            print("Erreur lors de l'enregistrement de l'image:", img_err)
-                            continue
-                    
-                        img = "screenshot.jpg" 
-                        imgtr = tansf_image(img)
-                        with torch.no_grad():
-                            blob1 = cv2.dnn.blobFromImage(frame, 1/255, (inpWidth, inpHeight), [0, 0, 0], 1, crop=False)
-                            net.setInput(blob1)
-                            outs1 = net.forward(getOutputsNames(net))
-                            try:
-                                m, c = matricule(frame, outs1)
-                            except Exception as mat_err:
-                                print("Erreur lors de la détection de la plaque d'immatriculation:", mat_err)
-                                continue
+         try:
+             s = time.time()
+             frame_counter = 0  
+             analyze_frame = True  
+             while self.cam.isOpened():
+                 ret, frame = self.cam.read()
+                 if ret:
+                     if analyze_frame:
+                         print("ok")
+                         blob = cv2.dnn.blobFromImage(frame, 1 / 255, (self.input_size, self.input_size), [0, 0, 0], 1, crop=False)
+                         self.net.setInput(blob)
+                         layersNames = self.net.getLayerNames()
+                         outputNames = [layersNames[i - 1] for i in self.net.getUnconnectedOutLayers()]
+                         outputs = self.net.forward(outputNames)
 
-                            try:
-                                output = brand(imgtr)
-                                probabilities = torch.exp(output)
-                                dim = 1               
-                                top_prob, top_class = probabilities.topk(1, dim)
-                                predicted_class_index = top_class.item()        
-                                predicted_class_name = idx_to_class[predicted_class_index]
-                                make, model = predicted_class_name.split(' ', 1)
-                            except Exception as brand_err:
-                                print("Erreur lors de la détection de la marque:", brand_err)
-                                continue
-                        
-                            try:
-                                json_data = {                                   
-                                    "activity": "Monitoring",                 
-                                    "class": closest_vehicle['name'],         
-                                    "classificators": [{                      
-                                        "make": make,                           
-                                        "model": model,                         
-                                        "class": closest_vehicle['name'],     
-                                        "color": closest_vehicle['colors'],  
-                                        "country": c,                           
-                                        "registration": m                       
-                                    }],                                           
-                                    "registration": m                          
-                                }                                             
-                                json_output = json.dumps(json_data, indent=4)
-                                print(json_output)
-                                self.publish_json_to_mqtt(json_output)
-                                print("Message sent") 
-                            except Exception as json_err:
-                                print("Erreur lors de la génération du JSON:", json_err)
-                                continue
-                except Exception as err:
-                    print("Une erreur est survenue lors du traitement de la vidéo:", err)
-                    continue
-            else:
-                print("time finished !!")
-                break
+                         closest_vehicle = postProcess(outputs, frame, self.colors, self.classNames, self.confThreshold, self.nmsThreshold,
+                                            self.required_class_index, self.tracker)
+                         json_data = None  # Initialisation de json_data à None
+                         if closest_vehicle:
+                             cv2.imwrite("screenshot.jpg", frame)
+                             with torch.no_grad():
+                                 blob1 = cv2.dnn.blobFromImage(frame, 1 / 255, (inpWidth, inpHeight), [0, 0, 0], 1, crop=False)
+                                 net.setInput(blob1)
+                                 outs1 = net.forward(getOutputsNames(net))
+                                 m, c = matricule(frame, outs1)
+                            
+                             if c != "Inconnu" and m != "Non detecte":  # Vérifier si la matricule et le pays sont détectés
+                                 json_data = {
+                                     "activity": "Monitoring",
+                                     "class": closest_vehicle['name'],
+                                     "classificators": [{
+                                         "make": closest_vehicle['make'],
+                                         "model": closest_vehicle['model'],
+                                         "class": closest_vehicle['name'],
+                                         "color": closest_vehicle['colors'],
+                                         "country": c,
+                                         "registration": m
+                                     }],
+                                     "registration": m
+                                 }
 
-
+                                 json_output = json.dumps(json_data, indent=4)
+                                 print(json_output)
+                                 self.publish_json_to_mqtt(json_output)
+                                 print("Message sent")
+                         analyze_frame = False  
+                     else:
+                         print("no")
+                         frame_counter += 1  
+                         if frame_counter == 7:  
+                             frame_counter = 0
+                             analyze_frame = True
+                 else:
+                     print("time finished !!")
+                     break
+         except Exception as e:
+          print(f"Erreur lors du traitement de la vidéo : {e}")
 
 
 if __name__ == "__main__":
@@ -304,3 +246,4 @@ if __name__ == "__main__":
     video_path = sys.argv[1]
     vc = VehicleCounter(video_path)
     vc.process_video()
+
