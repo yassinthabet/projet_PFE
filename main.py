@@ -196,7 +196,7 @@ class VehicleCounter:
 
                          closest_vehicle = postProcess(outputs, frame, self.colors, self.classNames, self.confThreshold, self.nmsThreshold,
                                             self.required_class_index, self.tracker)
-                         json_data = None  # Initialisation de json_data à None
+                         json_data = None  
                          if closest_vehicle:
                              cv2.imwrite("screenshot.jpg", frame)
                              with torch.no_grad():
