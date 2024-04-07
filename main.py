@@ -205,7 +205,7 @@ class VehicleCounter:
                                  outs1 = net.forward(getOutputsNames(net))
                                  m, c = matricule(frame, outs1)
                             
-                             if c != "Inconnu" and m != "Non detecte":  # Vérifier si la matricule et le pays sont détectés
+                             if c != "Inconnu" and m != "Non detecte":  
                                  json_data = {
                                      "activity": "Monitoring",
                                      "class": closest_vehicle['name'],
