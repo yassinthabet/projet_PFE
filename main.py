@@ -16,7 +16,12 @@ import cv2 as cv
 import pytesseract
 import re
 import traceback
-
+import os                                                             
+                                                                      
+                                                                      
+def get_video_name(video_path):                                       
+    return os.path.basename(video_path) 
+    
 confThreshold = 0.5  
 nmsThreshold = 0.4  
 inpWidth = 416  
@@ -149,6 +154,7 @@ def matricule(frame, outs, width_factor=1.1, height_factor=1.0):
 class VehicleCounter:
     def __init__(self, video_path):
         try:
+            self.video_name = get_video_name(video_path) 
             self.broker_address = "127.0.0.1"
             self.broker_port = 1883
             self.topic = "vehicle_data"
@@ -167,6 +173,12 @@ class VehicleCounter:
             self.colors = np.random.randint(0, 255, size=(len(self.classNames), 3), dtype='uint8')
         except Exception as e:
             print("Erreur lors de la lecture du fichier de classes:", e)
+    def send_video_name(self):                                        
+        try:                                                          
+            video_name_json = json.dumps({"video_name": self.video_na})
+            self.publish_json_to_mqtt(video_name_json)                
+        except Exception as e:                                        
+            print("Erreur lors de l'envoi du nom de la vidéo:", e)    
 
     def publish_json_to_mqtt(self, json_data):
         try:
@@ -179,6 +191,7 @@ class VehicleCounter:
             
     def process_video(self):
          try:
+             self.send_video_name()
              s = time.time()
              frame_counter = 0  
              analyze_frame = True  
@@ -204,8 +217,8 @@ class VehicleCounter:
                                  outs1 = net.forward(getOutputsNames(net))
                                  m, c = matricule(frame, outs1)
                             
-                             if c != "Inconnu" and m != "Non detecte":  # Vérifier si la matricule et le pays sont détectés
-                                 json_data = {
+                               
+                             json_data = {
                                      "activity": "Monitoring",
                                      "class": closest_vehicle['name'],
                                      "classificators": [{
@@ -219,8 +232,9 @@ class VehicleCounter:
                                      "registration": m
                                  }
 
-                                 json_output = json.dumps(json_data, indent=4)
-                                 print(json_output)
+                             json_output = json.dumps(json_data, indent=4)
+                             print(json_output)
+                             if c != "Inconnu" and m != "Non detecte":
                                  self.publish_json_to_mqtt(json_output)
                                  print("Message sent")
                          analyze_frame = False  
