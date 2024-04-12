@@ -1,4 +1,3 @@
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 
 # 🚗 Vehicle Detection, Classification, and Counting using OpenCV
 
@@ -32,14 +31,13 @@
 3. ⚙️ Adjust paths and parameters in config.py.
 4. 🏃‍♂️ Execute:
    ```shell
-   python main.py
+   python main.py video.mp4
    ```
 5. 🖱 In the new window, double-click to position the counting line. Watch as vehicle stats get tallied in real-time!
 
 ---
 
 ## ⚙️ Configurations Parameters
-- `VIDEO_PATH`: Pathway to your footage.
 - `INPUT_SIZE`: YOLO model's desired input dimensions.
 - `CONFIDENCE_THRESHOLD`: Desired confidence level for detections.
 - `NMS_THRESHOLD`: Non-max suppression's threshold.
